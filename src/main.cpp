@@ -3,6 +3,7 @@
 #include "vector.h"
 #include "entity.h"
 #include "physics.h"
+#include "camera.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -49,61 +50,92 @@ int init_app(App *app, int width, int height, float fps) {
     return 0;
 }
 
-struct Camera {
-    Vec2 position;
-};
-
 void render_particle(Camera *camera, Entity *particle) {
     if (camera) {
         if (particle) {
             float x = particle->position.x + camera->position.x;
             float y = particle->position.y + camera->position.y;
+            x = x * (1/camera->scale);
+            y = y * (1/camera->scale);
             al_draw_filled_circle(x, y, particle->radius, al_map_rgb(255, 255, 255));
         }
     }
 }
 
-void render_quadtree(QuadTree *node) {
+void render_quadtree(Camera *camera, QuadTree *node) {
     if (node->child[0]) {
         for (ptrdiff_t i = 0; i < 4; i++) {
-            render_quadtree(node->child[i]);
+            render_quadtree(camera, node->child[i]);
         }
     } else {
         float x0, y0, x1, y1;
-        x0 = node->bounds.center.x - node->bounds.half_dim;
-        x1 = node->bounds.center.x + node->bounds.half_dim;
-        y0 = node->bounds.center.y + node->bounds.half_dim;
-        y1 = node->bounds.center.y - node->bounds.half_dim;
+        Vec2 center = node->bounds.center;
+        center = add(center, camera->position);
+        Vec2 upper_left = {center.x - node->bounds.half_dim, center.y + node->bounds.half_dim};
+        Vec2 lower_right = {center.x + node->bounds.half_dim, center.y - node->bounds.half_dim};
+
+        upper_left = scale(upper_left, 1 / camera->scale);
+        lower_right = scale(lower_right, 1 / camera->scale);
+
+
+        x0 = upper_left.x;
+        x1 = lower_right.x;
+        y0 = upper_left.y;
+        y1 = lower_right.y;
+
+        
         al_draw_rectangle(x0,y0,x1,y1,al_map_rgb(0,255,0), 2);
     }
 }
 
-void render_velocity(Entity *entity) {
-    Vec2 transformed_vector = add(entity->position, entity->velocity);
+void render_velocity(Camera *camera, Entity *entity) {
+    Vec2 position = add(entity->position, camera->position);
+    Vec2 transformed_vector = add(position, entity->velocity);
     float x0, x1, y0, y1;
-    x0 = entity->position.x;
-    y0 = entity->position.y;
-    x1 = transformed_vector.x;
-    y1 = transformed_vector.y;
+    x0 = position.x * (1 / camera->scale);
+    y0 = position.y * (1 / camera->scale);
+    x1 = transformed_vector.x * (1 / camera->scale);
+    y1 = transformed_vector.y * (1 / camera->scale);
     al_draw_line(x0,y0,x1,y1,al_map_rgb(0,0,255),2);
 }
 
-void render_acceleration(Entity *entity) {
-    Vec2 transformed_vector = add(entity->position, entity->acceleration);
+void render_acceleration(Camera *camera, Entity *entity) {
+    Vec2 position = add(entity->position, camera->position);
+    Vec2 transformed_vector = add(position, entity->acceleration);
     float x0, x1, y0, y1;
-    x0 = entity->position.x;
-    y0 = entity->position.y;
-    x1 = transformed_vector.x;
-    y1 = transformed_vector.y;
+    x0 = position.x * (1 / camera->scale);
+    y0 = position.y * (1 / camera->scale);
+    x1 = transformed_vector.x * (1 / camera->scale);
+    y1 = transformed_vector.y * (1 / camera->scale);
     al_draw_line(x0,y0,x1,y1,al_map_rgb(255,120,255),2);
 }
 
 double rotation_curve(double distance) {
-    return log10(distance);
+    return log10(distance*2);
 }
 
 static bool g_render_COM = true;
 static bool g_render_tree = false;
+
+bool g_pressed_keys[ALLEGRO_KEY_MAX] = {};
+
+double FindMaxDistance(Entity *entities, ptrdiff_t n_entities) {
+    double max_distance = 0.0;
+
+    for (ptrdiff_t i = 0; i < n_entities; i++) {
+        for (ptrdiff_t j = i; j < n_entities; j++) {
+            if (i == j) {
+                continue;
+            }
+            double distance = euclidean_distance(entities[i].position, entities[j].position);
+            if (distance > max_distance) {
+                max_distance = distance;
+            }
+        }
+    }
+
+    return max_distance;
+}
 
 int main(int argc, char *argv[]) {
 
@@ -157,8 +189,12 @@ int main(int argc, char *argv[]) {
     const double world_height = (double)screen_height*4;
 
     Camera camera = {};
-    camera.position.x = world_width;
-    camera.position.y = world_height;
+    camera.position.x = -3*world_width/8;
+    camera.position.y = -3*world_height/8;
+    camera.scale = 10;
+    camera.zoom_speed = 0.1;
+    camera.velocity.x = 50;
+    camera.velocity.y = 50;
 
     
     /* initialize random number generator */
@@ -166,8 +202,8 @@ int main(int argc, char *argv[]) {
     std::mt19937 rng(dev());
     const double pi = acos(-1);
     std::uniform_real_distribution<double> random_angle(0, 2*pi);
-    std::uniform_real_distribution<double> random_radius(100, world_width/2);
-    std::uniform_real_distribution<double> random_velocity(-0.1,0.1);
+    std::uniform_real_distribution<double> random_radius(50, world_width/3);
+    std::uniform_real_distribution<double> random_velocity(-0.1,0.4);
     std::uniform_real_distribution<double> random_mass(0.2,3);
 
     /* initialize quadtree root node */
@@ -186,7 +222,7 @@ int main(int argc, char *argv[]) {
     entity->velocity = {};
     entity->acceleration = {};
     entity->is_active = true;
-    entity->mass = 100000;
+    entity->mass = 1000000;
     entity->radius = log10(entity->mass) + 1;
 
     /* randomly generate rest of galaxy */
@@ -239,19 +275,17 @@ int main(int argc, char *argv[]) {
                 case ALLEGRO_KEY_C:
                     g_render_COM = !g_render_COM;
                     break;
-                case ALLEGRO_KEY_W:
-                    break;
-                case ALLEGRO_KEY_S:
-                    break;
-                case ALLEGRO_KEY_A:
-                    break;
-                case ALLEGRO_KEY_D:
+                default:
+                    g_pressed_keys[event.keyboard.keycode] = true;
                     break;
             }
         }
 
         if (event.type == ALLEGRO_EVENT_KEY_UP) {
             switch (event.keyboard.keycode) {
+                default:
+                    g_pressed_keys[event.keyboard.keycode] = false;
+                    break;
             }
         }
 
@@ -273,7 +307,7 @@ int main(int argc, char *argv[]) {
 
             /* re-build the quadtree */
             QT_FreeTree(root);
-            root = QT_Create(center, world_width/2.0);
+            root = QT_Create(center, world_width/2);
             root->is_tree_root = true;
             for (ptrdiff_t i = 0; i < n_entities; i++) {
                 if (entities[i].is_active) {
@@ -284,8 +318,40 @@ int main(int argc, char *argv[]) {
             /* update the center of mass */
             QT_UpdateCOM(root);
 
+            
+            
+
             /* check collisions */
             //QT_HandleCollisions(root);  
+            
+            /* handle inputs */
+            if (g_pressed_keys[ALLEGRO_KEY_W]) {
+                camera.position.y += camera.velocity.y * dt;
+            }
+
+            if (g_pressed_keys[ALLEGRO_KEY_S]) {
+                camera.position.y -= camera.velocity.y * dt;
+            }
+
+            if (g_pressed_keys[ALLEGRO_KEY_A]) {
+                camera.position.x += camera.velocity.x * dt;
+            }
+
+            if (g_pressed_keys[ALLEGRO_KEY_D]) {
+                camera.position.x -= camera.velocity.x * dt;
+            }
+
+            if (g_pressed_keys[ALLEGRO_KEY_Q]) {
+                camera.scale += camera.zoom_speed * dt;
+            }
+
+            if (g_pressed_keys[ALLEGRO_KEY_E]) {
+                if (camera.scale > 0.01) {
+                    camera.scale -= camera.zoom_speed * dt;
+                } else {
+                    camera.scale = 0.01;
+                }
+            }
 
             redraw = true;
         }
@@ -304,8 +370,8 @@ int main(int argc, char *argv[]) {
             for (ptrdiff_t i = 0; i < n_entities; i++) {
                 if (entities[i].is_active) {
                     render_particle(&camera, &entities[i]);
-                    render_velocity(&entities[i]);
-                    render_acceleration(&entities[i]);
+                    render_velocity(&camera, &entities[i]);
+                    render_acceleration(&camera, &entities[i]);
                 }
             }
 
@@ -314,17 +380,13 @@ int main(int argc, char *argv[]) {
             }
 
             if (g_render_tree) {
-                render_quadtree(root);
+                render_quadtree(&camera, root);
             }
             al_flip_display();
             redraw = false;
         }
 
     }
-
-
-
-
 
     /* clean up and exit */
 
