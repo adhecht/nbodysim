@@ -80,6 +80,8 @@ double rotation_curve(double distance) {
 
 static bool g_render_COM = true;
 static bool g_render_tree = false;
+static bool g_render_velocity = false;
+static bool g_render_acceleration = false;
 
 bool g_pressed_keys[ALLEGRO_KEY_MAX] = {};
 
@@ -239,6 +241,12 @@ int main(int argc, char *argv[]) {
                 case ALLEGRO_KEY_C:
                     g_render_COM = !g_render_COM;
                     break;
+                case ALLEGRO_KEY_V:
+                    g_render_velocity = !g_render_velocity;
+                    break;
+                case ALLEGRO_KEY_B:
+                    g_render_acceleration = !g_render_acceleration;
+                    break;
                 default:
                     g_pressed_keys[event.keyboard.keycode] = true;
                     break;
@@ -319,23 +327,24 @@ int main(int argc, char *argv[]) {
 
             redraw = true;
         }
+
         if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             is_running = false;
         }
 
-        
-
         if (redraw) {
-
-                
 
             al_clear_to_color(al_map_rgb(0,0,0));
 
             for (ptrdiff_t i = 0; i < n_entities; i++) {
                 if (entities[i].is_active) {
                     render_particle(&camera, &entities[i]);
-                    render_velocity(&camera, &entities[i]);
-                    render_acceleration(&camera, &entities[i]);
+                    if (g_render_velocity) {
+                        render_velocity(&camera, &entities[i]);
+                    }
+                    if (g_render_acceleration) {
+                        render_acceleration(&camera, &entities[i]);
+                    }
                 }
             }
 
@@ -353,7 +362,6 @@ int main(int argc, char *argv[]) {
     }
 
     /* clean up and exit */
-
     QT_FreeTree(root);
 
     al_destroy_display(display);
