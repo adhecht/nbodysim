@@ -363,6 +363,7 @@ int main(int argc, char *argv[]) {
 
     /* clean up and exit */
     QT_FreeTree(root);
+    free(entities);
 
     al_destroy_display(display);
     al_destroy_event_queue(queue);
