@@ -12,6 +12,6 @@ struct AABB {
     double half_dim;
 };
 
-bool ContainsPoint(AABB, Vec2);
+bool RegionContainsPoint(AABB, Vec2);
 
 #endif
