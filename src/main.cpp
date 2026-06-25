@@ -14,42 +14,6 @@
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_primitives.h>
 
-struct Window {
-    int width, height;
-};
-
-struct App {
-    ALLEGRO_DISPLAY *display;
-    ALLEGRO_TIMER *timer;
-    ALLEGRO_EVENT_QUEUE *queue;
-    Window window;
-    float target_fps;
-};
-
-bool g_allegro_initialized = false;
-
-int init_app(App *app, int width, int height, float fps) {
-    if (!g_allegro_initialized) { 
-        al_init();
-        g_allegro_initialized = true;
-    }
-    if (app) {
-        if (!app->display) {
-            app->display = al_create_display(width, height);
-            app->window.width = width;
-            app->window.height = height;
-        }
-        if (!app->timer) {
-            app->timer = al_create_timer(1.0f / fps);
-            app->target_fps = fps;
-        }
-        if (!app->queue) {
-            app->queue = al_create_event_queue();
-        }
-    }
-    return 0;
-}
-
 void render_particle(Camera *camera, Entity *particle) {
     if (camera) {
         if (particle) {
