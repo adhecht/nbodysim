@@ -349,7 +349,10 @@ int main(int argc, char *argv[]) {
             }
 
             if (g_render_COM) {
-                al_draw_filled_circle(root->center_of_mass.x, root->center_of_mass.y, 5, al_map_rgb(255,0,0));
+                Vec2 center_of_mass = root->center_of_mass;
+                center_of_mass = add(center_of_mass, camera->position);
+                center_of_mass = scale(center_of_mass, 1 / camera->scale);
+                al_draw_filled_circle(center_of_mass.x, center_of_mass.y, 5, al_map_rgb(255,0,0));
             }
 
             if (g_render_tree) {
