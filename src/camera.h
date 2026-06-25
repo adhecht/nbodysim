@@ -14,15 +14,4 @@ struct Camera {
     double scale;
 };
 
-struct Mat33 {
-    float e[3*3];
-};
-
-Mat33 CreateBasisMatrix();
-Mat33 CreateCameraMatrix(Camera*);
-Mat33 multiply(Mat33, Mat33);
-Vec2 multiply(Mat33, Vec2);
-void PrintMatrix(Mat33);
-
 #endif
-
