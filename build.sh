@@ -17,11 +17,13 @@ $CXX $CXFLAGS src/quadtree.cpp -o build/quadtree.o
 $CXX $CXFLAGS src/bounding_box.cpp -o build/bounding_box.o
 $CXX $CXFLAGS src/vector.cpp -o build/vector.o
 $CXX $CXFLAGS src/physics.cpp -o build/physics.o
+$CXX $CXFLAGS src/render.cpp -o build/render.o
 
 $LD $LDFLAGS build/main.o \
         build/quadtree.o \
         build/bounding_box.o \
         build/vector.o \
         build/physics.o \
+	    build/render.o \
         $LDLIBS \
         -o $EXECUTABLE
